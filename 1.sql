@@ -1,0 +1,57 @@
+-- https://school.programmers.co.kr/learn/courses/30/lessons/273711
+
+/*
+    My Code (MySQL)
+    [WITH]
+    ITEM_INFO 테이블 만으로는 PARENT_ITEM_ID(업그레이드 되기 전 아이템) 추출이 불가능하므로
+    ITEM_INFO, ITEM_TREE 두 테이블을 JOIN해서 한 테이블 내에서 현재 아이템과 업그레이 되기 전 아이템을
+    모두 포함하는 테이블(JOIN_TAB)을 만듬
+    [메인쿼리]
+    JOIN TAB 테이블을 셀프 조인해서 업그레이드 되는 아이템의 정보를 얻어냄
+*/
+WITH JOIN_TAB AS (
+    SELECT A.ITEM_ID, A.ITEM_NAME, A.RARITY, B.PARENT_ITEM_ID
+    FROM ITEM_INFO A JOIN ITEM_TREE B
+    ON A.ITEM_ID = B.ITEM_ID
+)
+
+SELECT B.ITEM_ID, B.ITEM_NAME, B.RARITY
+FROM JOIN_TAB A JOIN JOIN_TAB B
+ON A.ITEM_ID = B.PARENT_ITEM_ID
+WHERE A.RARITY = 'RARE'
+ORDER BY B.ITEM_ID DESC;
+
+
+/*
+    보완 WITH GEMINI (WITH절 없이)
+*/
+SELECT INFO.ITEM_ID, INFO.ITEM_NAME, INFO.RARITY
+FROM ITEM_INFO INFO
+JOIN ITEM_TREE TREE ON INFO.ITEM_ID = TREE.ITEM_ID
+-- 부모 아이템이 희귀도 'RARE'인 ITEM만 거름
+WHERE TREE.PARENT_ITEM_ID IN (
+    -- 희귀도 'RARE'인 ITEM_ID만 모음
+    SELECT ITEM_ID
+    FROM ITEM_INFO
+    WHERE RARITY = 'RARE'
+)
+ORDER BY INFO.ITEM_ID DESC;
+
+
+/*
+    Oracle Version (계층형 질의)
+*/
+-- 마찬가지로 JOIN을 이용해 현재 아이템과 부모아이템(ID)이 한 행에 표시되도록
+WITH JOIN_TAB AS (
+    SELECT A.ITEM_ID, A.ITEM_NAME, A.RARITY, B.PARENT_ITEM_ID
+    FROM ITEM_INFO A JOIN ITEM_TREE B
+    ON A.ITEM_ID = B.ITEM_ID
+)
+SELECT ITEM_ID, ITEM_NAME, RARITY
+FROM JOIN_TAB
+-- WHERE 절은 모든 계층형 질의가 끝난 후 진행
+WHERE PARENT_ITEM_ID IS NOT NULL
+    AND PRIOR RARITY = 'RARE'
+START WITH PARENT_ITEM_ID IS NULL
+CONNECT BY PRIOR ITEM_ID = PARENT_ITEM_ID
+ORDER BY ITEM_ID DESC;
